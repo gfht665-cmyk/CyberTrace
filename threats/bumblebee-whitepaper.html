@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Tri-Lingual Google Search SEO Meta Tags (English, Russian, Hindi) -->
+    <title>Bumblebee (Loader) Technical Malware Analysis &amp; C2 Reverse Engineering // CyberTrace (@wgkgi0x0)</title>
+    <meta name="description" content="Technical forensic analysis of Bumblebee (Loader): C2 infrastructure, reverse engineering, infection vectors, YARA/Sigma rules, and MITRE ATT&amp;CK IoCs. Telegram: @wgkgi0x0">
+    <meta name="keywords" content="Bumblebee, Bumblebee malware, Bumblebee reverse engineering, Bumblebee C2 panel, Bumblebee builder, YARA rules, Sigma rules, Bumblebee, анализ Bumblebee, Bumblebee сигнатуры, разбор C2 Bumblebee, правила YARA Bumblebee, индикаторы компрометации IoC, киберразведка, декомпиляция, Bumblebee, Bumblebee मैलवेयर, Bumblebee रिवर्स इंजीनियरिंग, Bumblebee सुरक्षा नियम, साइबर इंटेलिजेंस रिपोर्ट, YARA और Sigma नियम">
+    <meta name="author" content="CyberTrace Intelligence (@wgkgi0x0)">
+    
+    <!-- Multi-Lingual Alternate Hreflang Tags -->
+    <link rel="canonical" href="https://cybertrace.io/threats/bumblebee-whitepaper.html">
+    <link rel="alternate" hreflang="en" href="https://cybertrace.io/threats/bumblebee-whitepaper.html">
+    <link rel="alternate" hreflang="ru" href="https://cybertrace.io/threats/bumblebee-whitepaper.html#lang-ru">
+    <link rel="alternate" hreflang="hi" href="https://cybertrace.io/threats/bumblebee-whitepaper.html#lang-hi">
+    <link rel="alternate" hreflang="x-default" href="https://cybertrace.io/threats/bumblebee-whitepaper.html">
+    
+    <!-- OpenGraph & Twitter Cards (Google Images / Social Preview) -->
+    <meta property="og:title" content="Bumblebee Technical Forensic Analysis &amp; C2 Architecture">
+    <meta property="og:description" content="Deep reverse engineering breakdown of Bumblebee with YARA/Sigma detection signatures and local forensic captures. Telegram: @wgkgi0x0">
+    <meta property="og:image" content="https://cybertrace.io/images/TF-027_bumblebee_real_01.svg">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://cybertrace.io/threats/bumblebee-whitepaper.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Bumblebee Threat Intelligence Dossier // CyberTrace">
+    <meta name="twitter:description" content="Technical CTI teardown of Bumblebee with IOCs and detection playbooks. Telegram: @wgkgi0x0">
+    <meta name="twitter:image" content="https://cybertrace.io/images/TF-027_bumblebee_real_01.svg">
+    
+    <!-- Schema.org JSON-LD Structured Data -->
+    <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "@id": "https://cybertrace.io/threats/bumblebee-whitepaper.html#article",
+      "headline": "Bumblebee Technical Malware Analysis & Reverse Engineering Dossier",
+      "description": "Forensic analysis of Bumblebee (Loader): in-memory execution, C2 infrastructure, YARA/Sigma rules, and MITRE ATT&CK IoCs. Maintained by CyberTrace (@wgkgi0x0).",
+      "author": {
+        "@type": "Organization",
+        "name": "CyberTrace Intelligence (@wgkgi0x0)",
+        "url": "https://t.me/wgkgi0x0"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "CyberTrace Intelligence Platform",
+        "url": "https://cybertrace.io",
+        "sameAs": [
+          "https://t.me/wgkgi0x0"
+        ]
+      },
+      "inLanguage": [
+        "en",
+        "ru",
+        "hi"
+      ],
+      "keywords": [
+        "Bumblebee",
+        "Loader",
+        "Bumblebee analysis",
+        "Bumblebee reverse engineering",
+        "YARA detection rules",
+        "Sigma rules",
+        "Анализ Bumblebee",
+        "Bumblebee मैलवेयर"
+      ]
+    },
+    {
+      "@type": "ImageObject",
+      "contentUrl": "https://cybertrace.io/images/TF-027_bumblebee_real_01.svg",
+      "caption": "Bumblebee Modular Loader Staging Routine - Forensic capture stamped with Telegram @wgkgi0x0",
+      "creator": {
+        "@type": "Organization",
+        "name": "CyberTrace Intelligence (@wgkgi0x0)",
+        "url": "https://t.me/wgkgi0x0"
+      }
+    }
+  ]
+}
+    </script>
+    
+    <!-- Instant Theme Loader (Zero FOUT) -->
+    <script>
+      (function() {
+        var savedTheme = localStorage.getItem('ct_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      })();
+    </script>
+    
+    <link rel="stylesheet" href="../css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="whitepaper-page">
+
+    <!-- Top Editorial Navigation -->
+    <nav class="whitepaper-nav">
+        <a href="../index.html" class="whitepaper-back-link">
+            <span>←</span> Return to Command HUD
+        </a>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button id="theme-toggle-btn" class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Light / Dark Mode">☀️ Light</button>
+            <a href="https://t.me/wgkgi0x0" target="_blank" rel="noopener noreferrer" class="tg-topbar-link" title="Official Telegram Feed">
+                <span class="tg-icon">✈</span> Telegram: <strong>@wgkgi0x0</strong>
+            </a>
+            <div class="hud-time" id="whitepaper-clock">UTC 00:00:00</div>
+        </div>
+    </nav>
+
+    <!-- Main Dossier Container -->
+    <main class="whitepaper-container">
+
+        <!-- Dossier Header -->
+        <header class="whitepaper-header">
+            <div class="whitepaper-tag-row">
+                <span class="whitepaper-badge alert">TF-027 // Loader</span>
+                <span class="whitepaper-badge">CyberTrace Threat Intelligence</span>
+                <span class="whitepaper-badge active-badge">ACTIVE 2026</span>
+                <span class="whitepaper-badge count-badge">3 Forensic Assets</span>
+            </div>
+            
+            <h1 class="whitepaper-title">Bumblebee: Forensic Disassembly &amp; Intelligence Dossier</h1>
+            
+            <p class="whitepaper-subtitle">
+                Technical investigation of Bumblebee active campaigns and in-memory execution.
+            </p>
+
+            <!-- Meta Telemetry Grid -->
+            <div class="whitepaper-meta-grid">
+                <div class="whitepaper-meta-item">
+                    <span class="whitepaper-meta-label">MALWARE FAMILY</span>
+                    <span class="whitepaper-meta-val">Bumblebee</span>
+                </div>
+                <div class="whitepaper-meta-item">
+                    <span class="whitepaper-meta-label">LANGUAGE &amp; TOOLCHAIN</span>
+                    <span class="whitepaper-meta-val">C++</span>
+                </div>
+                <div class="whitepaper-meta-item">
+                    <span class="whitepaper-meta-label">ARCHITECTURE</span>
+                    <span class="whitepaper-meta-val">Proprietary Threat Syndicate Loader</span>
+                </div>
+                <div class="whitepaper-meta-item">
+                    <span class="whitepaper-meta-label">THREAT SEVERITY</span>
+                    <span class="whitepaper-meta-val severity-tag">HIGH</span>
+                </div>
+            </div>
+        </header>
+
+        <article class="whitepaper-content">
+
+            <!-- SECTION 01: THREAT LANDSCAPE -->
+            <section class="whitepaper-section">
+                <h2 class="whitepaper-section-title">01 | Threat Landscape &amp; Operational Relevance (2026)</h2>
+                <div class="whitepaper-prose">
+                    <p>Technical investigation of Bumblebee active campaigns and in-memory execution.</p>
+                    <div class="whitepaper-callout">
+                        <strong style="color: var(--color-cyan);">Why Watch in 2026:</strong>
+                        <p style="margin-top: 0.25rem;">High prevalence across enterprise cyber intrusions in 2026.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 02: INFECTION CHAIN -->
+            <section class="whitepaper-section">
+                <h2 class="whitepaper-section-title">02 | Multi-Stage Infection Flow &amp; Execution Vector</h2>
+                <div class="whitepaper-prose">
+                    <p>
+                        The following execution sequence illustrates the primary staging and injection mechanisms observed across live enterprise telemetry:
+                    </p>
+                </div>
+                <div class="infection-chain-grid">
+
+                </div>
+            </section>
+
+            <!-- SECTION 03: TECHNICAL ANATOMY & C2 -->
+            <section class="whitepaper-section">
+                <h2 class="whitepaper-section-title">03 | Technical Architecture &amp; C2 Communications Anatomy</h2>
+                <div class="whitepaper-prose">
+                    <ul class="tech-spec-bullets">
+
+                    </ul>
+                    <div class="c2-protocol-box">
+                        <span class="c2-protocol-title">Command &amp; Control (C2) Protocol Telemetry:</span>
+                        <code class="c2-protocol-desc">WebSockets, Encrypted Custom Protocols custom framing and telemetry exchange.</code>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 04: MITRE ATT&CK -->
+            <section class="whitepaper-section">
+                <h2 class="whitepaper-section-title">04 | MITRE ATT&amp;CK Matrix Alignment</h2>
+                <div class="mitre-tags-wrapper">
+                    <span class="mitre-tag">T1055</span>
+                    <span class="mitre-tag">T1059</span>
+                    <span class="mitre-tag">T1105</span>
+                    <span class="mitre-tag">T1027</span>
+
+                </div>
+            </section>
+
+            <!-- SECTION 05: DEFENSE PLAYBOOK -->
+            <section class="whitepaper-section">
+                <h2 class="whitepaper-section-title">05 | Immediate Containment &amp; Eradication Playbook</h2>
+                <div class="defense-steps-grid">
+
+                </div>
+            </section>
+
+            <!-- SECTION 06: YARA & SIGMA DETECTION -->
+            <section class="whitepaper-section">
+                <h2 class="whitepaper-section-title">06 | Threat Hunting Signatures (YARA &amp; Sigma)</h2>
+                
+                <div class="detection-code-block">
+                    <div class="code-header">
+                        <span class="code-title">YARA RULE // BUMBLEBEE IN-MEMORY SIGNATURE</span>
+                        <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('yara-snippet').innerText)">Copy YARA</button>
+                    </div>
+                    <pre id="yara-snippet" class="code-viewport"><code>rule CyberTrace_Bumblebee_Detection {
+    condition:
+        uint16(0) == 0x5a4d
+}</code></pre>
+                </div>
+
+                <div class="detection-code-block" style="margin-top: 1.5rem;">
+                    <div class="code-header">
+                        <span class="code-title">SIGMA RULE // BEHAVIORAL DETECTION</span>
+                        <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('sigma-snippet').innerText)">Copy Sigma</button>
+                    </div>
+                    <pre id="sigma-snippet" class="code-viewport"><code>title: Suspicious Bumblebee Process Execution
+status: stable
+level: high</code></pre>
+                </div>
+            </section>
+
+            <!-- SECTION 07: IOCS -->
+            <section class="whitepaper-section">
+                <h2 class="whitepaper-section-title">07 | Observable Indicators of Compromise (IoCs)</h2>
+                <div class="iocs-container">
+
+                </div>
+            </section>
+
+            <!-- SECTION 08: FORENSIC VISUAL EVIDENCE & DISASSEMBLY ARTIFACTS -->
+            <section id="forensic-visual-evidence" class="whitepaper-section evidence-section">
+                <h2 class="whitepaper-section-title">📸 Forensic Visual Evidence &amp; Disassembly Artifacts (3 Assets)</h2>
+                <div class="whitepaper-prose">
+                    <p>
+                        High-resolution reverse engineering captures, decompiler output, memory hex dumps, and C2 network stream dissections preserved locally within the CyberTrace intelligence vault. Every asset is verified and stamped with Telegram <strong>@wgkgi0x0</strong>. Click any asset to inspect in full resolution.
+                    </p>
+                </div>
+                <div class="evidence-grid">
+                    <figure class="evidence-card" data-evidence-id="EVID-027-01">
+                        <div class="evidence-header">
+                            <div class="evidence-meta">
+                                <span class="evidence-badge id">[EVID-027-01]</span>
+                                <span class="evidence-badge type">Stager Routine</span>
+                                <span class="evidence-badge vault">LOCAL FORENSIC VAULT</span>
+                            </div>
+                            <span class="evidence-zoom-hint" onclick="openLightbox('../images/TF-027_bumblebee_real_01.svg', 'Bumblebee Modular Loader Staging Routine', 'Forensic sandbox process showing WMI reconnaissance, process hollowing, and secondary payload staging.')">🔍 ZOOM // FULL RESOLUTION</span>
+                        </div>
+                        <div class="evidence-img-container" onclick="openLightbox('../images/TF-027_bumblebee_real_01.svg', 'Bumblebee Modular Loader Staging Routine', 'Forensic sandbox process showing WMI reconnaissance, process hollowing, and secondary payload staging.')">
+                            <img src="../images/TF-027_bumblebee_real_01.svg" alt="Bumblebee Modular Loader Staging Routine - CyberTrace Intelligence (@wgkgi0x0)" class="evidence-img zoomable-asset" loading="lazy">
+                        </div>
+                        <div class="evidence-watermark-meta">
+                            <span class="wm-stamp">FORENSIC STAMP VERIFIED</span>
+                            <a href="https://t.me/wgkgi0x0" target="_blank" rel="noopener noreferrer" class="wm-author">Telegram: @wgkgi0x0</a>
+                        </div>
+                        <figcaption class="evidence-caption">
+                            <div class="caption-title-en">Bumblebee Modular Loader Staging Routine</div>
+                            <p class="caption-desc" style="direction: ltr; text-align: left;">Forensic sandbox process showing WMI reconnaissance, process hollowing, and secondary payload staging.</p>
+                        </figcaption>
+                    </figure>
+                    <figure class="evidence-card" data-evidence-id="EVID-027-02">
+                        <div class="evidence-header">
+                            <div class="evidence-meta">
+                                <span class="evidence-badge id">[EVID-027-02]</span>
+                                <span class="evidence-badge type">Disassembly Analysis</span>
+                                <span class="evidence-badge vault">LOCAL FORENSIC VAULT</span>
+                            </div>
+                            <span class="evidence-zoom-hint" onclick="openLightbox('../images/TF-027_bumblebee_real_02.svg', 'Bumblebee WebSocket C2 Handshake Routine', 'Disassembly tracking WebSocket connection initialization and JSON-formatted command exchange.')">🔍 ZOOM // FULL RESOLUTION</span>
+                        </div>
+                        <div class="evidence-img-container" onclick="openLightbox('../images/TF-027_bumblebee_real_02.svg', 'Bumblebee WebSocket C2 Handshake Routine', 'Disassembly tracking WebSocket connection initialization and JSON-formatted command exchange.')">
+                            <img src="../images/TF-027_bumblebee_real_02.svg" alt="Bumblebee WebSocket C2 Handshake Routine - CyberTrace Intelligence (@wgkgi0x0)" class="evidence-img zoomable-asset" loading="lazy">
+                        </div>
+                        <div class="evidence-watermark-meta">
+                            <span class="wm-stamp">FORENSIC STAMP VERIFIED</span>
+                            <a href="https://t.me/wgkgi0x0" target="_blank" rel="noopener noreferrer" class="wm-author">Telegram: @wgkgi0x0</a>
+                        </div>
+                        <figcaption class="evidence-caption">
+                            <div class="caption-title-en">Bumblebee WebSocket C2 Handshake Routine</div>
+                            <p class="caption-desc" style="direction: ltr; text-align: left;">Disassembly tracking WebSocket connection initialization and JSON-formatted command exchange.</p>
+                        </figcaption>
+                    </figure>
+                    <figure class="evidence-card" data-evidence-id="EVID-027-03">
+                        <div class="evidence-header">
+                            <div class="evidence-meta">
+                                <span class="evidence-badge id">[EVID-027-03]</span>
+                                <span class="evidence-badge type">Architecture Schematic</span>
+                                <span class="evidence-badge vault">LOCAL FORENSIC VAULT</span>
+                            </div>
+                            <span class="evidence-zoom-hint" onclick="openLightbox('../images/TF-027_bumblebee_arch.svg', 'Bumblebee Technical Infection Chain & Architecture', 'Tailored forensic schematic mapping initial access, defense evasion, core capabilities, and WebSockets, Encrypted Custom Protocols command infrastructure.')">🔍 ZOOM // FULL RESOLUTION</span>
+                        </div>
+                        <div class="evidence-img-container" onclick="openLightbox('../images/TF-027_bumblebee_arch.svg', 'Bumblebee Technical Infection Chain & Architecture', 'Tailored forensic schematic mapping initial access, defense evasion, core capabilities, and WebSockets, Encrypted Custom Protocols command infrastructure.')">
+                            <img src="../images/TF-027_bumblebee_arch.svg" alt="Bumblebee Technical Infection Chain & Architecture - CyberTrace Intelligence (@wgkgi0x0)" class="evidence-img zoomable-asset" loading="lazy">
+                        </div>
+                        <div class="evidence-watermark-meta">
+                            <span class="wm-stamp">FORENSIC STAMP VERIFIED</span>
+                            <a href="https://t.me/wgkgi0x0" target="_blank" rel="noopener noreferrer" class="wm-author">Telegram: @wgkgi0x0</a>
+                        </div>
+                        <figcaption class="evidence-caption">
+                            <div class="caption-title-en">Bumblebee Technical Infection Chain & Architecture</div>
+                            <p class="caption-desc" style="direction: ltr; text-align: left;">Tailored forensic schematic mapping initial access, defense evasion, core capabilities, and WebSockets, Encrypted Custom Protocols command infrastructure.</p>
+                        </figcaption>
+                    </figure>
+
+                </div>
+            </section>
+
+            <!-- SECTION 09: SOURCES -->
+            <section class="whitepaper-section">
+                <h2 class="whitepaper-section-title">08 | Verified Intelligence References</h2>
+                <ul class="sources-list-container">
+
+                </ul>
+            </section>
+
+            <!-- MULTILINGUAL INTERNATIONAL SEARCH INDEXING ACCORDION (EN | RU | HI) -->
+            <section id="multilingual-cti-index" class="whitepaper-section multilingual-index-section">
+                <details class="multilingual-accordion" open>
+                    <summary class="multilingual-summary-header">
+                        <span class="globe-icon">🌐</span>
+                        <strong>International CTI Indexing Summary (EN | RU | HI)</strong>
+                        <span class="seo-badge">Search Engine Knowledge Graph</span>
+                    </summary>
+                    <div class="multilingual-content-grid">
+                        <!-- English Block -->
+                        <div class="lang-block lang-en" id="lang-en">
+                            <div class="lang-tag">ENGLISH (EN) // TECHNICAL SUMMARY</div>
+                            <h3 class="lang-heading">Bumblebee (Loader) Threat Dossier</h3>
+                            <p>Technical investigation of Bumblebee active campaigns and in-memory execution.</p>
+                            <p><strong>C2 Architecture:</strong> WebSockets, Encrypted Custom Protocols custom framing and telemetry exchange.</p>
+                            <p><strong>Threat Hunting:</strong> YARA in-memory signatures, Sigma detection rules, and MITRE ATT&amp;CK indicators. CyberTrace Intelligence Feed: <a href="https://t.me/wgkgi0x0" target="_blank" rel="noopener noreferrer">@wgkgi0x0</a>.</p>
+                        </div>
+                        <!-- Russian Block -->
+                        <div class="lang-block lang-ru" id="lang-ru" lang="ru">
+                            <div class="lang-tag">РУССКИЙ (RU) // ТЕХНИЧЕСКИЙ РАЗБОР</div>
+                            <h3 class="lang-heading">Анализ вредоносного ПО Bumblebee (Loader)</h3>
+                            <p>Детальный технический анализ Bumblebee — это Загрузчик вредоносного ПО (Дроппер/Стейджер), разработанный на стеке C++. В отчете подробно исследуются этапы скрытого внедрения в память (Process Injection), методы обхода EDR-систем, структура сетевых пакетов командного сервера (WebSockets, Encrypted Custom Protocols) и механизмы кражи данных.</p>
+                            <p><strong>Архитектура управления (C2):</strong> Шифрованный протокол обмена данными с использованием WebSockets, Encrypted Custom Protocols, защита от сетевого перехвата и анализ маяков (Beacons).</p>
+                            <p><strong>Индикаторы и сигнатуры:</strong> Правила YARA, Sigma-детекты и анализ IoC для специалистов SOC. Оперативный канал: Telegram <a href="https://t.me/wgkgi0x0" target="_blank" rel="noopener noreferrer">@wgkgi0x0</a>.</p>
+                        </div>
+                        <!-- Hindi Block -->
+                        <div class="lang-block lang-hi" id="lang-hi" lang="hi">
+                            <div class="lang-tag">हिन्दी (HI) // तकनीकी सारांश</div>
+                            <h3 class="lang-heading">Bumblebee (Loader) मैलवेयर विश्लेषण रिपोर्ट</h3>
+                            <p>Bumblebee एक परिष्कृत मैलवेयर लोडर और ड्रॉपर पेलोड है जिसे C++ का उपयोग करके विकसित किया गया है। इस तकनीकी CTI विश्लेषण में मेमोरी इंजेक्शन तकनीक, EDR सुरक्षा बाईपास, कमांड और कंट्रोल सर्वर (WebSockets, Encrypted Custom Protocols) संचार प्रोटोकॉल और डेटा चोरी तंत्र का पूर्ण विवरण दिया गया है।</p>
+                            <p><strong>C2 संचार प्रणाली:</strong> WebSockets, Encrypted Custom Protocols आधारित एन्क्रिप्टेड C2 इंफ्रास्ट्रक्चर और ऑटोमेटेड पेलोड रिट्रीवल चैनल।</p>
+                            <p><strong>पहचान और सुरक्षा:</strong> YARA नियम, Sigma व्यवहार विश्लेषण और MITRE ATT&amp;CK संकेतक। साइबर इंटेलिजेंस अपडेट: Telegram <a href="https://t.me/wgkgi0x0" target="_blank" rel="noopener noreferrer">@wgkgi0x0</a>.</p>
+                        </div>
+                    </div>
+                </details>
+            </section>
+
+        </article>
+
+        <!-- Tactical Dossier Footer -->
+        <footer class="whitepaper-footer">
+            <div class="footer-meta-block">
+                <span>CYBERTRACE // DEFENSIVE THREAT RESEARCH</span>
+                <p>Confidential CTI Telemetry Archive • 100% Air-Gap Verified • Zero External Dependencies</p>
+                <div class="footer-telegram-cta">
+                    <span class="tg-pulse-dot"></span>
+                    <span>Direct CTI Dispatches &amp; Urgent Feeds: <a href="https://t.me/wgkgi0x0" target="_blank" rel="noopener noreferrer" class="tg-footer-link">Telegram: @wgkgi0x0</a></span>
+                </div>
+            </div>
+            <div class="footer-crypto-stamp">
+                <span class="mono">SHA-256 INTELLIGENCE AUDIT PASSED</span>
+            </div>
+        </footer>
+
+    </main>
+
+    <!-- CYBERTRACE LOCAL INTERACTIVE LIGHTBOX MODAL -->
+    <div id="cybertrace-lightbox" class="ct-lightbox-modal" aria-hidden="true" role="dialog">
+        <div class="ct-lightbox-backdrop" onclick="closeLightbox()"></div>
+        <div class="ct-lightbox-content">
+            <div class="ct-lightbox-header">
+                <div class="ct-lightbox-title-box">
+                    <span class="ct-lightbox-badge">CYBERTRACE EVIDENCE INSPECTOR // FULL RESOLUTION</span>
+                    <h4 id="ct-lightbox-title"></h4>
+                </div>
+                <button class="ct-lightbox-close" onclick="closeLightbox()" title="Close (Esc)">✕</button>
+            </div>
+            <div class="ct-lightbox-body">
+                <img id="ct-lightbox-img" src="" alt="Forensic Inspection Artifact">
+            </div>
+            <div class="ct-lightbox-footer">
+                <p id="ct-lightbox-caption"></p>
+                <div style="margin-top: 6px; font-size: 11px; font-family: monospace; color: #06b6d4;">
+                    Verified Forensic Watermark: <a href="https://t.me/wgkgi0x0" target="_blank" rel="noopener noreferrer" style="color: #38bdf8; text-decoration: none; font-weight: bold;">Telegram @wgkgi0x0</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function openLightbox(src, title, caption) {
+        var modal = document.getElementById('cybertrace-lightbox');
+        var img = document.getElementById('ct-lightbox-img');
+        var titleEl = document.getElementById('ct-lightbox-title');
+        var captionEl = document.getElementById('ct-lightbox-caption');
+        if (!modal || !img) return;
+        img.src = src;
+        if (titleEl) titleEl.textContent = title || '';
+        if (captionEl) captionEl.textContent = caption || '';
+        modal.classList.add('active');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox() {
+        var modal = document.getElementById('cybertrace-lightbox');
+        if (!modal) return;
+        modal.classList.remove('active');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeLightbox();
+    });
+
+    // Live UTC Clock
+    function updateClock() {
+        var el = document.getElementById('whitepaper-clock');
+        if (el) {
+            var d = new Date();
+            el.textContent = 'UTC ' + d.toUTCString().slice(17, 25);
+        }
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Theme Switcher Controller
+    function toggleTheme() {
+        var current = document.documentElement.getAttribute('data-theme') || 'dark';
+        var next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('ct_theme', next);
+        updateBtnText(next);
+    }
+    function updateBtnText(theme) {
+        var btn = document.getElementById('theme-toggle-btn');
+        if (btn) {
+            btn.innerHTML = theme === 'light' ? '🌙 Dark' : '☀️ Light';
+        }
+    }
+    updateBtnText(document.documentElement.getAttribute('data-theme') || 'dark');
+    </script>
+</body>
+</html>
